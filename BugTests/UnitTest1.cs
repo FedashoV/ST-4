@@ -1,35 +1,239 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using BugPro;
-using System;
+using Stateless;
 
-namespace BugTests
+namespace BugTests;
+
+[TestClass]
+public class BugStateTests
 {
-    [TestClass]
-    public class BugWorkflowTests
+    private Bug _bug;
+
+    [TestInitialize]
+    public void Setup()
     {
-        [TestMethod] public void T01_StartState() => Assert.AreEqual(State.NewDefect, new Bug().CurrentState);
-        [TestMethod] public void T02_New_Analyze() { var b = new Bug(); b.Analyze(); Assert.AreEqual(State.Analysis, b.CurrentState); }
-        [TestMethod] public void T03_Analysis_Reject() { var b = new Bug(); b.Analyze(); b.Reject(); Assert.AreEqual(State.Returned, b.CurrentState); }
-        [TestMethod] public void T04_Analysis_StartFix() { var b = new Bug(); b.Analyze(); b.StartFix(); Assert.AreEqual(State.Resolution, b.CurrentState); }
-        [TestMethod] public void T05_Analysis_AskInfo() { var b = new Bug(); b.Analyze(); b.AskInfo(); Assert.AreEqual(State.NeedMoreInfo, b.CurrentState); }
-        [TestMethod] public void T06_NeedMoreInfo_To_Analysis() { var b = new Bug(); b.Analyze(); b.AskInfo(); b.ProvideInfo(); Assert.AreEqual(State.Analysis, b.CurrentState); }
-        [TestMethod] public void T07_NeedMoreInfo_To_Resolution() { var b = new Bug(); b.Analyze(); b.AskInfo(); b.ContinueFix(); Assert.AreEqual(State.Resolution, b.CurrentState); }
-        [TestMethod] public void T08_Resolution_Success() { var b = new Bug(); b.Analyze(); b.StartFix(); b.VerifySuccess(); Assert.AreEqual(State.Closed, b.CurrentState); }
-        [TestMethod] public void T09_Resolution_Fail() { var b = new Bug(); b.Analyze(); b.StartFix(); b.VerifyFailure(); Assert.AreEqual(State.Returned, b.CurrentState); }
-        [TestMethod] public void T10_Resolution_CantRepro() { var b = new Bug(); b.Analyze(); b.StartFix(); b.ReportCannotReproduce(); Assert.AreEqual(State.Review, b.CurrentState); }
-        [TestMethod] public void T11_Resolution_To_NeedMoreInfo() { var b = new Bug(); b.Analyze(); b.StartFix(); b.ReturnForInfo(); Assert.AreEqual(State.NeedMoreInfo, b.CurrentState); }
-        [TestMethod] public void T12_Review_Close() { var b = new Bug(); b.Analyze(); b.StartFix(); b.ReportCannotReproduce(); b.ConfirmNotRepro(); Assert.AreEqual(State.Closed, b.CurrentState); }
-        [TestMethod] public void T13_Review_Return() { var b = new Bug(); b.Analyze(); b.StartFix(); b.ReportCannotReproduce(); b.ConfirmBugExists(); Assert.AreEqual(State.Returned, b.CurrentState); }
-        [TestMethod] public void T14_Closed_Reopen() { var b = new Bug(); b.Analyze(); b.StartFix(); b.VerifySuccess(); b.Reopen(); Assert.AreEqual(State.Reopened, b.CurrentState); }
-        [TestMethod] public void T15_Reopened_Analyze() { var b = new Bug(); b.Analyze(); b.StartFix(); b.VerifySuccess(); b.Reopen(); b.AnalyzeAgain(); Assert.AreEqual(State.Analysis, b.CurrentState); }
-        [TestMethod] public void T16_Invalid_New_Reject() => Assert.ThrowsException<InvalidOperationException>(() => new Bug().Reject());
-        [TestMethod] public void T17_Invalid_Analysis_Success() { var b = new Bug(); b.Analyze(); Assert.ThrowsException<InvalidOperationException>(() => b.VerifySuccess()); }
-        [TestMethod] public void T18_Invalid_Resolution_DirectClose() { var b = new Bug(); b.Analyze(); b.StartFix(); Assert.ThrowsException<InvalidOperationException>(() => b.ConfirmNotRepro()); }
-        [TestMethod] public void T19_Invalid_Analysis_CantRepro() { var b = new Bug(); b.Analyze(); Assert.ThrowsException<InvalidOperationException>(() => b.ReportCannotReproduce()); }
-        [TestMethod] public void T20_Invalid_Returned_Reopen() { var b = new Bug(); b.Analyze(); b.Reject(); Assert.ThrowsException<InvalidOperationException>(() => b.Reopen()); }
-        [TestMethod] public void T21_Invalid_New_StartFix() => Assert.ThrowsException<InvalidOperationException>(() => new Bug().StartFix());
-        [TestMethod] public void T22_Invalid_Closed_VerifySuccess() { var b = new Bug(); b.Analyze(); b.StartFix(); b.VerifySuccess(); Assert.ThrowsException<InvalidOperationException>(() => b.VerifySuccess()); }
-        [TestMethod] public void T23_Invalid_Review_StartFix() { var b = new Bug(); b.Analyze(); b.StartFix(); b.ReportCannotReproduce(); Assert.ThrowsException<InvalidOperationException>(() => b.StartFix()); }
-        [TestMethod] public void T24_Invalid_NeedMoreInfo_Reject() { var b = new Bug(); b.Analyze(); b.AskInfo(); Assert.ThrowsException<InvalidOperationException>(() => b.Reject()); }
+        _bug = new Bug("Test bug description");
+    }
+
+    [TestMethod]
+    public void Bug_InitialState_ShouldBeOpen()
+    {
+        Assert.AreEqual(BugState.Open, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_Assign_ShouldChangeStateToAssigned()
+    {
+        _bug.Assign();
+        Assert.AreEqual(BugState.Assigned, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_Assign_ShouldSetAssignee()
+    {
+        _bug.Assign();
+        Assert.AreEqual("Developer", _bug.Assignee);
+    }
+
+    [TestMethod]
+    public void Bug_FromOpen_StartProgress_ShouldThrowException()
+    {
+        Assert.ThrowsException<InvalidOperationException>(() => _bug.StartProgress());
+    }
+
+    [TestMethod]
+    public void Bug_FromAssigned_StartProgress_ShouldChangeStateToInProgress()
+    {
+        _bug.Assign();
+        _bug.StartProgress();
+        Assert.AreEqual(BugState.InProgress, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromInProgress_Fix_ShouldChangeStateToFixed()
+    {
+        _bug.Assign();
+        _bug.StartProgress();
+        _bug.Fix();
+        Assert.AreEqual(BugState.Fixed, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromFixed_Verify_ShouldChangeStateToVerified()
+    {
+        _bug.Assign();
+        _bug.StartProgress();
+        _bug.Fix();
+        _bug.Verify();
+        Assert.AreEqual(BugState.Verified, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromVerified_Close_ShouldChangeStateToClosed()
+    {
+        _bug.Assign();
+        _bug.StartProgress();
+        _bug.Fix();
+        _bug.Verify();
+        _bug.Close();
+        Assert.AreEqual(BugState.Closed, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromClosed_Reopen_ShouldChangeStateToReopened()
+    {
+        _bug.Assign();
+        _bug.StartProgress();
+        _bug.Fix();
+        _bug.Verify();
+        _bug.Close();
+        _bug.Reopen();
+        Assert.AreEqual(BugState.Reopened, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromOpen_Reject_ShouldChangeStateToRejected()
+    {
+        _bug.Reject();
+        Assert.AreEqual(BugState.Rejected, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromRejected_Reopen_ShouldChangeStateToReopened()
+    {
+        _bug.Reject();
+        _bug.Reopen();
+        Assert.AreEqual(BugState.Reopened, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromOpen_Defer_ShouldChangeStateToDeferred()
+    {
+        _bug.Defer();
+        Assert.AreEqual(BugState.Deferred, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromDeferred_Assign_ShouldChangeStateToAssigned()
+    {
+        _bug.Defer();
+        _bug.Assign();
+        Assert.AreEqual(BugState.Assigned, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromAssigned_Reassign_ShouldKeepAssignedState()
+    {
+        _bug.Assign();
+        _bug.Reassign();
+        Assert.AreEqual(BugState.Assigned, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromInProgress_Reject_ShouldChangeStateToRejected()
+    {
+        _bug.Assign();
+        _bug.StartProgress();
+        _bug.Reject();
+        Assert.AreEqual(BugState.Rejected, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromFixed_Reopen_ShouldChangeStateToReopened()
+    {
+        _bug.Assign();
+        _bug.StartProgress();
+        _bug.Fix();
+        _bug.Reopen();
+        Assert.AreEqual(BugState.Reopened, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromReopened_Assign_ShouldChangeStateToAssigned()
+    {
+        _bug.Assign();
+        _bug.StartProgress();
+        _bug.Fix();
+        _bug.Verify();
+        _bug.Close();
+        _bug.Reopen();
+        _bug.Assign();
+        Assert.AreEqual(BugState.Assigned, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromOpen_Close_ShouldThrowException()
+    {
+        Assert.ThrowsException<InvalidOperationException>(() => _bug.Close());
+    }
+
+    [TestMethod]
+    public void Bug_Description_ShouldBeSetCorrectly()
+    {
+        string description = "Memory leak occurs after 2 hours";
+        var newBug = new Bug(description);
+        Assert.AreEqual(description, newBug.Description);
+    }
+
+    [TestMethod]
+    public void Bug_CompleteWorkflow_ShouldEndInClosedState()
+    {
+        _bug.Assign();
+        _bug.StartProgress();
+        _bug.Fix();
+        _bug.Verify();
+        _bug.Close();
+        Assert.AreEqual(BugState.Closed, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_ReopenAfterReject_ShouldBeReopened()
+    {
+        _bug.Reject();
+        _bug.Reopen();
+        Assert.AreEqual(BugState.Reopened, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromVerified_Reopen_ShouldChangeStateToReopened()
+    {
+        _bug.Assign();
+        _bug.StartProgress();
+        _bug.Fix();
+        _bug.Verify();
+        _bug.Reopen();
+        Assert.AreEqual(BugState.Reopened, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_FromReopened_Reject_ShouldChangeStateToRejected()
+    {
+        _bug.Assign();
+        _bug.StartProgress();
+        _bug.Fix();
+        _bug.Verify();
+        _bug.Close();
+        _bug.Reopen();
+        _bug.Reject();
+        Assert.AreEqual(BugState.Rejected, _bug.CurrentState);
+    }
+
+    [TestMethod]
+    public void Bug_MultipleTransitions_ShouldMaintainCorrectState()
+    {
+        _bug.Assign();
+        Assert.AreEqual(BugState.Assigned, _bug.CurrentState);
+        
+        _bug.StartProgress();
+        Assert.AreEqual(BugState.InProgress, _bug.CurrentState);
+        
+        _bug.Fix();
+        Assert.AreEqual(BugState.Fixed, _bug.CurrentState);
+        
+        _bug.Verify();
+        Assert.AreEqual(BugState.Verified, _bug.CurrentState);
+        
+        _bug.Close();
+        Assert.AreEqual(BugState.Closed, _bug.CurrentState);
     }
 }
