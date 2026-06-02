@@ -25,7 +25,7 @@ public enum BugTrigger
     Reopen,
     Reject,
     Defer,
-    Reassign  // Добавлен триггер Reassign
+    Reassign
 }
 
 public class Bug
@@ -33,7 +33,7 @@ public class Bug
     private StateMachine<BugState, BugTrigger> _machine;
     private BugState _currentState;
     private string _description;
-    private string _assignee;
+    private string? _assignee;
 
     public Bug(string description)
     {
@@ -46,7 +46,7 @@ public class Bug
 
     public BugState CurrentState => _currentState;
     public string Description => _description;
-    public string Assignee => _assignee;
+    public string? Assignee => _assignee;
 
     private void ConfigureMachine()
     {
@@ -57,7 +57,7 @@ public class Bug
 
         _machine.Configure(BugState.Assigned)
             .Permit(BugTrigger.StartProgress, BugState.InProgress)
-            .PermitReentry(BugTrigger.Reassign)  // ← PermitReentry, а не PermitReentrant
+            .PermitReentry(BugTrigger.Reassign)
             .OnEntryFrom(BugTrigger.Assign, () => _assignee = "Developer")
             .OnEntryFrom(BugTrigger.Reassign, () => _assignee = "Another Developer");
 
